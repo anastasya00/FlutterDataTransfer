@@ -6,12 +6,11 @@
 
 #include <../libclient/thread.hpp>
 
-// Механизм завершения работы программы
 std::mutex exitMutex;
 std::condition_variable exitCondition;
 bool exitFlag = false;
+ThreadManager threadManager;
 
-// Обработчик сигнала для завершения программы
 void signalHandler(int signum) {
     std::cout << "\nПрограмма завершает работу (сигнал: " << signum << ")" << std::endl;
     {
@@ -19,24 +18,21 @@ void signalHandler(int signum) {
         exitFlag = true;
     }
     exitCondition.notify_one();
+
+    threadManager.stopThreads();
 }
 
 int main() {
     std::signal(SIGINT, signalHandler);
 
     try {
-        ThreadManager threadManager;
-        threadManager.startThreads();
-
-        std::cout << "Программа запущена. Нажмите Ctrl+C для выхода." << std::endl;
+        std::cout << "Программа запущена. Нажмите Ctrl+C для выхода.\n" << std::endl;
 
         {
             std::unique_lock<std::mutex> lock(exitMutex);
             exitCondition.wait(lock, [] { return exitFlag; });
         }
 
-        threadManager.stopThreads();
-        std::cout << "Работа потоков завершена." << std::endl;
     } catch (const std::exception& ex) {
         std::cerr << "Ошибка: " << ex.what() << std::endl;
         return 1;

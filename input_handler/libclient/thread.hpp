@@ -8,6 +8,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <queue>
+#include <atomic>
 
 #include <buffer.hpp>
 #include <socket.hpp>
@@ -26,7 +27,7 @@ class ThreadManager {
         std::thread processingThread;
         std::mutex threadMutex;
         std::condition_variable dataCV;
-        bool stopFlag;
+        std::atomic<bool> stopFlag;
 
         void inputHandler();
         void processingHandler();

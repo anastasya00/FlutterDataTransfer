@@ -1,7 +1,5 @@
-import 'package:english_words/english_words.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import 'server.dart';
 
 void main() {
@@ -18,7 +16,7 @@ class MyApp extends StatelessWidget {
       create: (context) => MyHomePageState(),
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'Namer App',
+        title: 'Data Receiver',
         theme: ThemeData(
           useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
@@ -35,21 +33,32 @@ class MyHomePage extends StatelessWidget {
     var appState = context.watch<MyHomePageState>();
 
     return Scaffold(
-      appBar: AppBar(title: Text('Data Analyzer'),),
+      appBar: AppBar(
+        title: Text('Данные от клиента:'),
+      ),
       body: Center(
-        child: Text(appState.receivedData),
+        child: Text(
+          appState.receivedData,
+          style: TextStyle(fontSize: 18),
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }
 }
 
 class MyHomePageState extends ChangeNotifier {
-  String _receivedData = '';
-
+  String _receivedData = 'Ожидание данных...';
   String get receivedData => _receivedData;
 
-  set receivedData(String newData) {
-    _receivedData = newData;
-    notifyListeners();
+  MyHomePageState() {
+    _subscribeToMessages();
+  }
+
+  void _subscribeToMessages() {
+    messageStream.listen((message) {
+      _receivedData = message;
+      notifyListeners();
+    });
   }
 }

@@ -42,7 +42,7 @@ bool SocketManager::sendData(const std::string& data) {
         return false;
     }
 
-    ssize_t byteSend = send(socketFd, data.c_str(), data.size(), 0);
+    ssize_t byteSend = send(socketFd, (data + "\n").c_str(), data.size() + 1, 0);
     if (byteSend == -1) {
         std::cerr << "Ошибка: данные не отправлены." << std::endl;
         return false;
@@ -52,6 +52,7 @@ bool SocketManager::sendData(const std::string& data) {
     return true;
 }
 
+// Метод отправки данных с повторными попытками
 bool SocketManager::sendDataWithRetry(const std::string& data) {
     for (int attempt = 0; attempt < 5; ++attempt) {
         if (sendData(data)) {
@@ -81,14 +82,3 @@ bool SocketManager::closeSocket() {
     }
     return false;
 }
-
-// // Метод мониторинга соединения с сервером
-// void SocketManager::monitoringConnection() {
-//     while (true) {
-//         std::this_thread::sleep_for(std::chrono::seconds(10));
-
-//         if (socketFd == -1) {
-//             reconnectServer();
-//         }
-//     }
-// }
