@@ -1,4 +1,4 @@
-# FlutterDataTransfer Project
+# FlutterDataTransfer
 
 ## Описание
 
