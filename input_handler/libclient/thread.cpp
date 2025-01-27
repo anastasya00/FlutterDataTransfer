@@ -3,16 +3,16 @@
 // Метод для запуска потоков
 void ThreadManager::startThreads() {
     inputThread = std::thread(&ThreadManager::inputHandler, this);
-    processingThread = std::thread(&ThreadManager::stopThreads, this);
+    processingThread = std::thread(&ThreadManager::processingHandler, this);
 }
 
-// Метод для ожидания заверщения потоков
+// Метод для ожидания завершения потоков
 void ThreadManager::stopThreads() {
     {
         std::lock_guard<std::mutex> lock(threadMutex);
-        isRunnig = false;
+        stopFlag = true;
     }
-    stopCV.notify_all();
+    dataCV.notify_all();
 
     if (inputThread.joinable()) {
         inputThread.join();
@@ -20,62 +20,90 @@ void ThreadManager::stopThreads() {
     if (processingThread.joinable()) {
         processingThread.join();
     }
+
+    std::cout << "Все потоки завершены." << std::endl;
 }
 
 // Поток ввода (1)
 void ThreadManager::inputHandler() {
-    while (isRunnig) {
-        std::unique_lock<std::mutex> lock(threadMutex);
-        if (!isRunnig) break;
-        lock.unlock();
+    try {
+        while (true) {
+            std::string inputUser;
+            std::cout << "Введите строку: ";
+            std::getline(std::cin, inputUser);
 
-        std::string inputUser;
-        std::cout << "Введите строку: " << std::endl;
-        std::getline(std::cin, inputUser);
+            if (std::cin.eof() || stopFlag) {
+                std::cout << "Ввод завершен. Выходим из inputHandler." << std::endl;
+                break;
+            }
 
-        if (inputUser.size() > 64 || !std::all_of(inputUser.begin(), inputUser.end(), ::isdigit)) {
-            std::cerr << "Ошибка: длина строки должна быть не более 64 символов и содержать только цифры." << std::endl;
-            continue;
+            if (inputUser.empty() || inputUser.size() > 64 || 
+                !std::all_of(inputUser.begin(), inputUser.end(), ::isdigit)) {
+                std::cerr << "Ошибка ввода: пустая строка, длина > 64 или недопустимые символы." << std::endl;
+                continue;
+            }
+
+            std::sort(inputUser.begin(), inputUser.end(), std::greater<char>());
+
+            std::string inputProcessed;
+            for (char elem : inputUser) {
+                inputProcessed += (elem - '0') % 2 == 0 ? "КВ" : std::string(1, elem);
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(threadMutex);
+                buffer_.setData(inputProcessed);
+            }
+            dataCV.notify_one();
+
+            std::cout << "Данные добавлены в буфер: " << inputProcessed << std::endl;
         }
-
-        std::sort(inputUser.begin(), inputUser.end(), std::greater<char>());
-
-        std::string inputProcessed;
-        for (char elem : inputUser) {
-            inputProcessed += (elem - '0') % 2 == 0 ? "КВ" : std::string(1, elem);
-        }
-        buffer_.setData(inputProcessed);
+    } catch (const std::exception& ex) {
+        std::cerr << "Исключение в inputHandler: " << ex.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Неизвестное исключение в inputHandler." << std::endl;
     }
 }
 
-// Поток обработки (2)
+// Поток обработки и отправки данных (2)
 void ThreadManager::processingHandler() {
-    SocketManager socket("127.0.0.1", 5000);
-    socket.connectServer();
+    try {
+        SocketManager socket("127.0.0.1", 5000);
 
-    while (isRunnig) {
-        std::unique_lock<std::mutex> lock(threadMutex);
-        stopCV.wait_for(lock, std::chrono::milliseconds(100), [this]() { return !isRunnig; });
-        if (!isRunnig) break;
+        while (true) {
+            std::string dataBuffer;
 
-        lock.unlock();
+            {
+                std::unique_lock<std::mutex> lock(threadMutex);
+                dataCV.wait(lock, [this]() { return !buffer_.getData().empty() || stopFlag; });
 
-        std::string dataBuffer = buffer_.getData();
-        if (dataBuffer.empty()) continue;
+                if (stopFlag && buffer_.getData().empty()) {
+                    std::cout << "Завершаем processingHandler. Нет данных для обработки." << std::endl;
+                    break;
+                }
 
-        std::cout << "Полученные данные: " << dataBuffer << std::endl;
+                dataBuffer = buffer_.getData();
+                buffer_.clearData();
+            }
 
-        long sum = 0;
-        for (char elem : dataBuffer) {
-            if (isdigit(elem)) {
-                sum += elem - '0';
+            std::cout << "Обработка данных: " << dataBuffer << std::endl;
+
+            long sum = 0;
+            for (char elem : dataBuffer) {
+                if (isdigit(elem)) {
+                    sum += elem - '0';
+                }
+            }
+
+            std::cout << "Сумма чисел: " << sum << std::endl;
+
+            if (!socket.sendDataWithRetry("SUM: " + std::to_string(sum))) {
+                std::cerr << "Ошибка: не удалось отправить данные после 5 попыток." << std::endl;
             }
         }
-
-        std::cout << "Сумма числовых элементов: " << sum << std::endl;
-
-        std::string sumData = "SUM: " + std::to_string(sum);
-        socket.sendData(sumData);
+    } catch (const std::exception& ex) {
+        std::cerr << "Исключение в processingHandler: " << ex.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Неизвестное исключение в processingHandler." << std::endl;
     }
 }
-

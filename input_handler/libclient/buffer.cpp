@@ -10,13 +10,15 @@ void Buffer::setData(const std::string& newData) {
 
 // Метод для получения данных буфера 
 std::string Buffer::getData() {
-    std::unique_lock<std::mutex> lock(mx);
-    
+    std::unique_lock<std::mutex> lock(mx);  
     cv.wait(lock, [this]() { return ready; });
+    ready = false;
+    return data;
+}
 
-    std::string result = data;
+// Метод для затирки данных буфера
+void Buffer::clearData() {
+    std::unique_lock<std::mutex> lock(mx);
     data.clear();
     ready = false;
-
-    return result;
 }

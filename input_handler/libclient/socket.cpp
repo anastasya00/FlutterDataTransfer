@@ -34,7 +34,7 @@ bool SocketManager::connectServer() {
 }
 
 // Метод отправки данных на сервер
-bool SocketManager::sendData(std::string& data) {
+bool SocketManager::sendData(const std::string& data) {
     std::lock_guard<std::mutex> lock(socketMutex);
 
     if (socketFd == -1) {
@@ -52,26 +52,21 @@ bool SocketManager::sendData(std::string& data) {
     return true;
 }
 
-// Метод переподключения к серверу
-bool SocketManager::reconnectServer() {
-    int maxRecconectAttemp = 10;
-    int delayMsec = 2000;
-
-    std::lock_guard<std::mutex> lock(socketMutex);
-
-    for (int attemp = 0; attemp <= maxRecconectAttemp; attemp++) {
-        std::cout << "Попытка переподключения " << attemp + 1 << " из " << maxRecconectAttemp << std::endl;
-
-        if (connectServer()) {
+bool SocketManager::sendDataWithRetry(const std::string& data) {
+    for (int attempt = 0; attempt < 5; ++attempt) {
+        if (sendData(data)) {
             return true;
         }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(delayMsec));
+        std::cerr << "Попытка отправки данных не удалась. Повтор через 2 секунды." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+        reconnectServer();
     }
-
-    std::cerr << "Ошибка: не удалось установить подключение к серверу " << maxRecconectAttemp << " попыток." << std::endl;
     return false;
-    
+}
+
+// Метод переподключения к серверу
+bool SocketManager::reconnectServer() {
+    return connectServer();
 }
 
 // Метод закрытия сокета
@@ -87,13 +82,13 @@ bool SocketManager::closeSocket() {
     return false;
 }
 
-// Метод мониторинга соединения с сервером
-void SocketManager::monitoringConnection() {
-    while (true) {
-        std::this_thread::sleep_for(std::chrono::seconds(10));
+// // Метод мониторинга соединения с сервером
+// void SocketManager::monitoringConnection() {
+//     while (true) {
+//         std::this_thread::sleep_for(std::chrono::seconds(10));
 
-        if (socketFd == -1) {
-            reconnectServer();
-        }
-    }
-}
+//         if (socketFd == -1) {
+//             reconnectServer();
+//         }
+//     }
+// }

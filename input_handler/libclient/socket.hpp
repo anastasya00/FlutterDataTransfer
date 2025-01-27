@@ -3,9 +3,8 @@
 #include <iostream>
 #include <string>
 #include <thread>
-#include <atomic>
 #include <mutex>
-#include <condition_variable>
+#include <queue>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -17,10 +16,10 @@ class SocketManager {
         ~SocketManager() { closeSocket(); };
 
         bool connectServer();
-        bool sendData(std::string& data);
+        bool sendData(const std::string& data);
+        bool sendDataWithRetry(const std::string& data);
         bool reconnectServer();
         bool closeSocket();
-        void monitoringConnection();
 
     private:
         std::string serverAddress;

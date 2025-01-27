@@ -10,6 +10,7 @@ class Buffer {
         
         void setData(const std::string& newData);
         std::string getData();
+        void clearData();
 
     private:
         std::string data;
